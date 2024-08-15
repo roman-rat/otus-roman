@@ -1,0 +1,40 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/centos9s"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "CentosWEB"
+    vb.cpus = 2
+    vb.memory = 4096
+    vb.customize ["createhd", "--filename", "D:/VM-Vbox/CentWEB.vdi", "--size", 25600]
+  end
+
+  # Использование Bridged Network с фиксированным IP
+  config.vm.network "public_network", ip: "192.168.1.125", bridge: "Intel(R) Ethernet Controller"
+
+  # Провижининг для настройки сети и базовой настройки
+  config.vm.provision "shell", inline: <<-SHELL
+    useradd roman
+    echo "roman:17896520" | chpasswd
+    usermod -aG wheel roman
+
+    dnf update -y
+  SHELL
+
+  # Провижининг Ansible
+  config.vm.provision "ansible" do |ansible|
+    ansible.playbook = "playbook.yml"
+    ansible.inventory_path = "inventory.ini"
+    ansible.ask_vault_pass = true 
+    
+    # Указываем пути к директории с шаблонами
+    ansible.extra_vars = {
+      ansible_become_pass: "{{ vault_sudo_password }}",
+      template_dir: "/vagrant/files"
+    }
+    
+    # Синхронизация каталога files на хосте с папкой на виртуальной машине
+    ansible.synced_folder = {
+      "files/" => "/vagrant/files"  
+    }
+  end
+end

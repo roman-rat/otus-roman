@@ -1,0 +1,50 @@
+---
+- hosts: all
+  become: true
+
+  vars:
+    nginx_port: 8080
+    site_content: "<h1>Hello, Otus!</h1>"
+  vars_files:
+    - vault.yml
+
+  tasks:
+    - name: Install Nginx
+      dnf:
+        name: nginx
+        state: present
+      notify: Start nginx
+
+    - name: Create web root directory
+      file:
+        path: /var/www/html
+        state: directory
+        owner: nginx
+        group: nginx
+        mode: '0755'
+
+    - name: Deploy index.html
+      template:
+        src: "{{ template_dir }}/index.html.j2"
+        dest: /var/www/html/index.html
+        owner: nginx
+        group: nginx
+        mode: '0644'
+
+    - name: Deploy nginx configuration
+      template:
+        src: "{{ template_dir }}/nginx.conf.j2"
+        dest: /etc/nginx/nginx.conf
+      notify: Reload nginx
+
+  handlers:
+    - name: Start nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
