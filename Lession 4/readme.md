@@ -1,4 +1,4 @@
-## Описание Vagrantfile
+## Описание Vagrantfile (сразу собирает RAID5)
 
 Этот Vagrantfile создаёт виртуальную машину с CentOS 9 Stream и настраивает её для работы с RAID массивом:
 
