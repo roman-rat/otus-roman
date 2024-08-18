@@ -1,0 +1,48 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/centos9s"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "CentRAID"
+    vb.cpus = 2
+    vb.memory = 4096
+    vb.customize ["createhd", "--filename", "D:/VM-Vbox/CentRAID_1.vdi", "--size", 5120]
+    vb.customize ["createhd", "--filename", "D:/VM-Vbox/CentRAID_2.vdi", "--size", 5120]
+    vb.customize ["createhd", "--filename", "D:/VM-Vbox/CentRAID_3.vdi", "--size", 5120]
+
+
+    # Подключаем созданные ранее диски к виртуальной машине
+    vb.customize ["storageattach", :id, "--storagectl", "SATA Controller", "--port", 1, "--device", 0, "--type", "hdd", "--medium", "D:/VM-Vbox/CentRAID_1.vdi"]
+    vb.customize ["storageattach", :id, "--storagectl", "SATA Controller", "--port", 2, "--device", 0, "--type", "hdd", "--medium", "D:/VM-Vbox/CentRAID_2.vdi"]
+    vb.customize ["storageattach", :id, "--storagectl", "SATA Controller", "--port", 3, "--device", 0, "--type", "hdd", "--medium", "D:/VM-Vbox/CentRAID_3.vdi"]
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    useradd roman
+    echo "roman:17896520" | chpasswd
+    usermod -aG wheel roman
+
+    # Устанавливаем необходимые пакеты
+    sudo dnf install -y mdadm
+    
+    # Создаем RAID 5 (на несистемных дисках)
+    sudo mdadm --create --verbose /dev/md0 --level=5 --raid-devices=3 /dev/sd[bcd]
+    
+    # Создаем файловую систему ext4 на RAID
+    sudo mkfs.ext4 /dev/md0
+    
+    # Создаем директорию для монтирования RAID
+    sudo mkdir -p /mnt/raid
+    
+    # Монтируем RAID
+    sudo mount /dev/md0 /mnt/raid
+    
+    # Настраиваем автосборку RAID при загрузке
+    sudo mdadm --detail --scan | sudo tee -a /etc/mdadm/mdadm.conf
+    sudo dracut --force --add mdadm
+    
+    # Добавляем RAID в fstab для автоподключения при загрузке
+    echo '/dev/md0 /mnt/raid ext4 defaults 0 0' | sudo tee -a /etc/fstab
+
+  SHELL
+
+end
