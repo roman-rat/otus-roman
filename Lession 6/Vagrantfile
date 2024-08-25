@@ -1,0 +1,57 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/centos9s"  # Изменение на CentOS 7
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "CentZFS1"
+    vb.cpus = 2
+    vb.memory = 4096
+    vb.customize ["createhd", "--filename", "D:/VM-Vbox/CentOS1.vdi", "--size", 10072]
+
+    # Создание 4 новых дисков
+    (1..4).each do |i|
+      vb.customize ['createhd', '--filename', "D:/VM-Vbox/extra_disk_#{i}.vdi", '--size', 1024]
+    end
+
+    # Подключение дисков к виртуальной машине
+    (1..4).each do |i|
+      vb.customize ['storageattach', :id, '--storagectl', 'SATA Controller', '--port', i, '--device', 0, '--type', 'hdd', '--medium', "D:/VM-Vbox/extra_disk_#{i}.vdi"]
+    end
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    # Добавляем пользователя и настраиваем его
+    useradd roman
+    echo "roman:17896520" | chpasswd
+    usermod -aG wheel roman
+
+    sudo dnf -y install epel-release
+    sudo dnf -y update
+    sudo dnf -y install https://zfsonlinux.org/epel/zfs-release-2-2.el9.noarch.rpm
+    ls -l /etc/pki/rpm-gpg/
+    sudo rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-openzfs
+    sudo dnf install -y dkms git gcc make autoconf automake libtool rpm-build
+    sudo dnf install -y zfs
+    sudo modprobe zfs
+
+
+
+    # Создание ZFS пулов
+    sudo zpool create pool_gzip /dev/sdb
+    sudo zpool create pool_zle /dev/sdc
+    sudo zpool create pool_lzjb /dev/sdd
+    sudo zpool create pool_lz4 /dev/sde
+
+    # Создание файловых систем для каждого пула
+    sudo zfs create pool_gzip/fs_gzip
+    sudo zfs create pool_zle/fs_zle
+    sudo zfs create pool_lzjb/fs_lzjb
+    sudo zfs create pool_lz4/fs_lz4
+
+    # Установка различных алгоритмов сжатия для каждой ФС
+    sudo zfs set compression=gzip pool_gzip/fs_gzip
+    sudo zfs set compression=zle pool_zle/fs_zle
+    sudo zfs set compression=lzjb pool_lzjb/fs_lzjb
+    sudo zfs set compression=lz4 pool_lz4/fs_lz4
+
+  SHELL
+end
