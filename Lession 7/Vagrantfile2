@@ -1,0 +1,145 @@
+Vagrant.configure("2") do |config|
+# Определение и настройка виртуальной машины NFS сервера
+config.vm.define "nfs_server" do |server|
+server.vm.box = "generic/centos9s"          # Используемый образ
+server.vm.hostname = "nfs-server.otus.com"  # Хостнейм машины
+server.vm.network "private_network", ip: "192.168.50.10"  # Приватный IP адрес
+
+server.vm.provider "virtualbox" do |vb|     # Настройки VirtualBox
+vb.name = "NFS Server"                    # Название машины в VirtualBox
+vb.cpus = 1                               # Количество процессоров
+vb.memory = 1024                          # Объем оперативной памяти
+end
+
+# Настройка и инициализация компонентов NFS и Kerberos на сервере
+server.vm.provision "shell", inline: <<-SHELL
+# Установка пакетов для NFS и Kerberos
+yum install -y nfs-utils krb5-server krb5-libs krb5-workstation
+
+# Добавление записей в /etc/hosts для корректного разрешения имен
+echo "192.168.50.10 nfs-server.otus.com" >> /etc/hosts
+echo "192.168.50.11 nfs-client.otus.com" >> /etc/hosts
+
+# Создание директории для экспорта и установка прав
+mkdir -p /export/upload
+chmod 0777 /export/upload
+
+# Конфигурация Kerberos
+cat <<EOF > /etc/krb5.conf
+[libdefaults]
+default_realm = OTUS.COM
+
+[realms]
+OTUS.COM = {
+kdc = nfs-server.otus.com
+admin_server = nfs-server.otus.com
+}
+
+[domain_realm]
+.otus.com = OTUS.COM
+otus.com = OTUS.COM
+EOF
+
+# Подготовка каталога для базы данных Kerberos
+mkdir -p /var/kerberos/krb5kdc
+chown -R root:root /var/kerberos/krb5kdc
+chmod -R 700 /var/kerberos/krb5kdc
+
+# Создание базы данных Kerberos
+kdb5_util create -s -P password
+
+# Добавление принципалов Kerberos
+kadmin.local -q "addprinc -pw password admin@OTUS.COM"
+kadmin.local -q "addprinc -randkey nfs/nfs-server.otus.com@OTUS.COM"
+kadmin.local -q "ktadd nfs/nfs-server.otus.com@OTUS.COM"
+
+# Настройка экспорта NFS
+echo "/export 192.168.50.0/24(rw,sec=krb5)" >> /etc/exports
+exportfs -rav
+
+# Настройка фаервола для доступа к NFS
+firewall-cmd --add-service=nfs --permanent
+firewall-cmd --add-service=mountd --permanent
+firewall-cmd --add-service=rpc-bind --permanent
+firewall-cmd --permanent --add-port=88/tcp
+firewall-cmd --permanent --add-port=749/tcp
+firewall-cmd --permanent --add-port=2049/tcp
+firewall-cmd --reload
+
+# Активация и запуск служб Kerberos и NFS
+systemctl enable --now krb5kdc kadmin
+systemctl enable --now nfs-server rpcbind
+
+# Копирование ключевого файла Kerberos для доступа vagrant
+sudo cp /etc/krb5.keytab /home/vagrant/
+sudo chown vagrant:vagrant /home/vagrant/krb5.keytab
+sed -i 's/PasswordAuthentication no/PasswordAuthentication yes/g' /etc/ssh/sshd_config
+systemctl restart sshd
+SHELL
+end
+
+# Определение и настройка виртуальной машины NFS клиента
+config.vm.define "nfs_client" do |client|
+client.vm.box = "generic/centos9s"
+client.vm.hostname = "nfs-client.otus.com"
+client.vm.network "private_network", ip: "192.168.50.11"
+
+client.vm.provider "virtualbox" do |vb|
+vb.name = "NFS Client"
+vb.cpus = 1
+vb.memory = 1024
+end
+
+# Настройка NFS клиента и Kerberos
+client.vm.provision "shell", inline: <<-SHELL
+# Установка NFS и Kerberos
+yum install -y nfs-utils krb5-workstation sshpass
+
+# Добавление записей в /etc/hosts
+echo "192.168.50.10 nfs-server.otus.com" >> /etc/hosts
+echo "192.168.50.11 nfs-client.otus.com" >> /etc/hosts
+
+# Настройка фаервола
+firewall-cmd --add-service=nfs --permanent
+firewall-cmd --add-service=mountd --permanent
+firewall-cmd --add-service=rpc-bind --permanent
+firewall-cmd --permanent --add-port=88/tcp
+firewall-cmd --permanent --add-port=749/tcp
+firewall-cmd --permanent --add-port=2049/tcp
+firewall-cmd --reload
+
+# Конфигурация Kerberos на клиенте
+cat <<EOF > /etc/krb5.conf
+[libdefaults]
+default_realm = OTUS.COM
+
+[realms]
+OTUS.COM = {
+kdc = nfs-server.otus.com
+admin_server = nfs-server.otus.com
+}
+
+[domain_realm]
+.otus.com = OTUS.COM
+otus.com = OTUS.COM
+EOF
+
+# Получение Kerberos тикета
+echo "password" | kinit admin@OTUS.COM
+
+# Передача krb5.keytab с сервера на клиента
+sshpass -p "vagrant" scp -o StrictHostKeyChecking=no vagrant@192.168.50.10:/home/vagrant/krb5.keytab /home/vagrant/
+sudo cp /home/vagrant/krb5.keytab /etc/
+sudo chown root:root /etc/krb5.keytab
+sudo chmod 600 /etc/krb5.keytab
+sudo systemctl restart rpc-gssd
+sudo systemctl restart nfs-utils.service
+
+# Монтирование NFSv4 с Kerberos
+mkdir -p /mnt/nfs
+echo "nfs-server.otus.com:/export /mnt/nfs nfs4 sec=krb5" >> /etc/fstab
+systemctl daemon-reload
+mount -a
+SHELL
+end
+end

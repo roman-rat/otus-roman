@@ -1,0 +1,58 @@
+# Основная конфигурация Vagrant
+Vagrant.configure("2") do |config|
+
+  # Определение и конфигурация виртуальной машины для NFS сервера
+  config.vm.define "nfs_server" do |server|
+    server.vm.box = "generic/centos9s" # Определение образа ОС
+    server.vm.hostname = "nfs-server" # Имя хоста сервера
+    server.vm.network "private_network", ip: "192.168.50.10" # Приватный IP для сервера
+    server.vm.provider "virtualbox" do |vb|
+      vb.name = "NFS Server" # Имя VM в VirtualBox
+      vb.cpus = 1            # Количество процессоров
+      vb.memory = 1024       # Количество RAM в MB
+    end
+
+    # Скрипт для настройки сервера NFS
+    server.vm.provision "shell", inline: <<-SHELL
+    yum install -y nfs-utils        # Установка утилит для NFS
+    systemctl enable --now nfs-server rpcbind # Запуск служб NFS и RPC
+    mkdir -p /export/upload         # Создание директории для экспорта
+    chown nobody:nobody /export/upload # Назначение владельца директории
+    chmod 0777 /export/upload       # Установка прав доступа
+
+    # Добавление настроек экспорта в /etc/exports и перезагрузка настроек экспорта
+    echo "/export 192.168.50.0/24(rw,sync,no_subtree_check)" >> /etc/exports
+    exportfs -rav
+
+    # Настройка брандмауэра для доступа к службам NFS
+    firewall-cmd --add-service=nfs --permanent
+    firewall-cmd --add-service=mountd --permanent
+    firewall-cmd --add-service=rpc-bind --permanent
+    firewall-cmd --reload
+    SHELL
+
+  end
+
+  # Определение и конфигурация виртуальной машины для NFS клиента
+  config.vm.define "nfs_client" do |client|
+    client.vm.box = "generic/centos9s"  # Определение образа ОС
+    client.vm.hostname = "nfs-client"  # Имя хоста клиента
+    client.vm.network "private_network", ip: "192.168.50.11" # Приватный IP для клиента
+    client.vm.provider "virtualbox" do |vb|
+      vb.name = "NFS Client" # Имя VM в VirtualBox
+      vb.cpus = 1            # Количество процессоров
+      vb.memory = 1024       # Количество RAM в MB
+    end
+
+    # Скрипт для настройки клиента NFS
+    client.vm.provision "shell", inline: <<-SHELL
+    yum install -y nfs-utils        # Установка утилит для NFS
+    mkdir /mnt/nfs                  # Создание точки монтирования
+    # Добавление записи в fstab для автоматического монтирования NFS при загрузке
+    echo "192.168.50.10:/export /mnt/nfs nfs vers=3,defaults 0 0" >> /etc/fstab
+    systemctl daemon-reload         # Перезагрузка systemd для применения изменений
+    mount -a                        # Монтирование всех файловых систем
+    SHELL
+
+  end
+end
