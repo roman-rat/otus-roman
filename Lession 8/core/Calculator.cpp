@@ -37,10 +37,10 @@ void Calculator::calculateLargeNumbers() {
 }
 
 void Calculator::inputMatrices(Matrix2d& mat1, Matrix2d& mat2) {
-    std::cout << "Введите элементы первой матрицы 2x2 (построчно): ";
+    std::cout << "Введите элементы первой матрицы 2x2 (4 числа построчно через пробел): ";
     std::cin >> mat1(0, 0) >> mat1(0, 1) >> mat1(1, 0) >> mat1(1, 1);
     
-    std::cout << "Введите элементы второй матрицы 2x2 (построчно): ";
+    std::cout << "Введите элементы второй матрицы 2x2 (4 числа построчно через пробел): ";
     std::cin >> mat2(0, 0) >> mat2(0, 1) >> mat2(1, 0) >> mat2(1, 1);
 }
 
