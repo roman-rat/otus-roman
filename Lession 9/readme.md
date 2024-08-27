@@ -13,17 +13,19 @@ sda
   └─centos9s-swap swap        1              f7767600-27fe-4f53-8a05-a0c5b63edcda                  [SWAP]
 ```
 
-При помощи `vgrename` меняем название на `centotus`. Затем обновляем `/etc/fstab`, чтобы не было записей о старом названии `centos9s`. После этого выполняем:
+При помощи `vgrename` меняем название на `centotus`. Затем обновляем `/etc/fstab`, чтобы не было записей о старом названии `centos9s`. 
+
+![Обновляем /etc/fstab](screens/1.png)
+
+_Обновляем `/etc/fstab`_
+
+После этого выполняем:
 
 ```bash
 sudo dracut -f -v
 ```
 
 для обновления initramfs.
-
-![Обновляем /etc/fstab](screens/1.png)
-
-_Обновляем `/etc/fstab`_
 
 ## 2) Включить отображение меню Grub
 
