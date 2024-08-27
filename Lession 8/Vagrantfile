@@ -1,0 +1,62 @@
+# Vagrantfile
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/centos9s"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "CentOS9CLI"  
+    vb.cpus = 4             
+    vb.memory = 4096        
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+
+
+    # Обновляем систему и устанавливаем необходимые пакеты
+    dnf --enablerepo=crb install -y eigen3-devel  # Устанавливаем eigen3-devel с включенным репозиторием CRB
+    dnf install -y rpm-build rpmdevtools gcc-c++ cmake gmp-devel eigen3-devel make createrepo
+
+
+    # Загрузка исходников из GitHub
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%208/core/CMakeLists.txt"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%208/core/Calculator.cpp"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%208/core/Calculator.h"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%208/core/main.cpp"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%208/core/calculator.spec"
+
+    # Настраиваем окружение 
+    su - vagrant -c "rpmdev-setuptree"
+
+    # Подготовка и упаковка исходников в архив для сборки RPM
+    mkdir -p calculator-1.0
+    cp main.cpp Calculator.cpp Calculator.h CMakeLists.txt calculator-1.0/
+    tar -czvf calculator-1.0.tar.gz calculator-1.0
+    mv calculator-1.0.tar.gz /home/vagrant/rpmbuild/SOURCES/
+    mv calculator.spec /home/vagrant/rpmbuild/SPECS/
+
+    # Создание RPM пакета
+    su - vagrant -c "rpmbuild -ba /home/vagrant/rpmbuild/SPECS/calculator.spec"
+
+    # Создание локального репозитория и добавление туда RPM пакета
+    mkdir -p /home/vagrant/repOtus/RPMS/x86_64
+    cp /home/vagrant/rpmbuild/RPMS/x86_64/calculator-1.0-1.el9.x86_64.rpm /home/vagrant/repOtus/RPMS/x86_64/
+
+
+    # Создание метаданных репозитория
+    createrepo /home/vagrant/repOtus/
+
+    # Настройка локального репозитория
+    cat <<EOF > /etc/yum.repos.d/repOtus.repo
+[repOtus]
+name=CalcOtus
+baseurl=file:///home/vagrant/repOtus/
+enabled=1
+gpgcheck=0
+EOF
+
+    # Очистка кэша и обновление списка пакетов 
+    dnf clean all
+    dnf makecache
+    dnf list calculator
+    dnf install -y calculator
+  SHELL
+end
