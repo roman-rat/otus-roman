@@ -25,7 +25,7 @@ Vagrant.configure("2") do |config|
     firewall-cmd --reload
 
     # Создаем скрипт мониторинга логов
-    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/1.sh"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/scripts/1.sh"
 
     chmod +x 1.sh
     bash 1.sh
@@ -33,13 +33,13 @@ Vagrant.configure("2") do |config|
     chmod +x /usr/local/bin/log_monitor.sh
 
     # Создаем конфиг для log_monitor
-    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/2.sh"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/scripts/2.sh"
 
     chmod +x 2.sh
     bash 2.sh
 
     # Создаем systemd unit-файл для log_monitor
-    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/3.sh"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/scripts/3.sh"
 
     chmod +x 3.sh
     bash 3.sh
@@ -48,7 +48,7 @@ Vagrant.configure("2") do |config|
     systemctl start log_monitor.service
 
     # Настройка и запуск fcgiwrap
-    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/4.sh"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/scripts/4.sh"
 
     chmod +x 4.sh
     bash 4.sh
@@ -57,7 +57,7 @@ Vagrant.configure("2") do |config|
     systemctl start fcgiwrap
 
     # Дорабатываем nginx.service для нескольких инстансов
-    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/5.sh"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/scripts/5.sh"
 
     chmod +x 5.sh
     bash 5.sh
@@ -76,14 +76,14 @@ Vagrant.configure("2") do |config|
     sed -i 's|pid /run/nginx.pid;|pid /run/nginx-instance2.pid;|g' /etc/nginx/nginx-instance2.conf
 
     # Создаем скрипт для добавления CGI-конфигурации
-    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/6.sh"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/scripts/6.sh"
 
     chmod +x 6.sh
     bash 6.sh
 
     # Скрипт для конфига проверки
     mkdir -p /usr/share/nginx/html/cgi-bin/
-    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/7.sh"
+    wget "https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2010/scripts/7.sh"
     bash 7.sh
     chmod +x /usr/share/nginx/html/cgi-bin/test.cgi
 
