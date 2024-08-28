@@ -1,5 +1,5 @@
 #!/bin/bash
-cat << EOF > /usr/share/nginx/html/cgi-bin/otus.cgi
+cat << EOF > /usr/share/nginx/html/cgi-bin/test.cgi
 #!/bin/bash
 echo "Content-type: text/html"
 echo
