@@ -5,7 +5,7 @@
     After=network.target
 
     [Service]
-    ExecStart=/usr/sbin/fcgiwrap -s unix:/run/fcgiwrap.socket
+    ExecStart=/usr/sbin/fcgiwrap -s tcp:127.0.0.1:9000
     User=nginx
     Group=nginx
     Restart=on-failure

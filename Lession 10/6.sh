@@ -1,7 +1,7 @@
     #!/bin/bash
     sed -i '/^[^#]*include \/etc\/nginx\/default.d\/\*.conf;/a \
     location /cgi-bin/ {\n\
-        fastcgi_pass unix:/run/fcgiwrap.socket;\n\
+        fastcgi_pass 127.0.0.1:9000;\n\
         include fastcgi_params;\n\
         fastcgi_param SCRIPT_FILENAME /usr/share/nginx/html$fastcgi_script_name;\n\
         fastcgi_param QUERY_STRING $query_string;\n\
@@ -12,7 +12,7 @@
 
     sed -i '/^[^#]*include \/etc\/nginx\/default.d\/\*.conf;/a \
     location /cgi-bin/ {\n\
-        fastcgi_pass unix:/run/fcgiwrap.socket;\n\
+        fastcgi_pass 127.0.0.1:9000;\n\
         include fastcgi_params;\n\
         fastcgi_param SCRIPT_FILENAME /usr/share/nginx/html$fastcgi_script_name;\n\
         fastcgi_param QUERY_STRING $query_string;\n\
