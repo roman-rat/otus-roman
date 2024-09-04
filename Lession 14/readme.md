@@ -3,7 +3,7 @@
 1. Установили Docker(уже включает в себя Docker Compose).
 2. Написали `Dockerfile` с кастомной страницей Nginx и собрали с него образ на базе Alpine Linux. 
 3. Проверили работоспособность образа и вывод curl.
-4. Залогинились через docker login и запушили контейнер в Hub https://hub.docker.com/r/romanatrashyonok/otuslession-dockernginx.
+4. Залогинились через docker login и запушили контейнер в [Hub](https://hub.docker.com/r/romanatrashyonok/otuslession-dockernginx).
 ```bash
 docker pull romanatrashyonok/otuslession-dockernginx
 ```
