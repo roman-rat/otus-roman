@@ -1,0 +1,39 @@
+services:
+  zabbix-proxy-leader:
+    image: zabbix/zabbix-proxy-sqlite3:latest
+    environment:
+      - ZBX_SERVER_HOST=192.168.1.104,10.0.0.2,10.0.0.3
+      - ZBX_HOSTNAME=ZabbixProxyLeader
+      - ZBX_PROXYMODE=1
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints:
+          - node.labels.role == leader
+      restart_policy:
+        condition: unless-stopped
+    ports:
+      - "10052:10051"
+    networks:
+      - zabbix-net
+
+  zabbix-proxy:
+    image: zabbix/zabbix-proxy-sqlite3:latest
+    environment:
+      - ZBX_SERVER_HOST=192.168.1.104,10.0.0.2,10.0.0.3
+      - ZBX_HOSTNAME=ZabbixProxyWorker
+      - ZBX_PROXYMODE=1
+    deploy:
+      mode: replicated
+      replicas: 2
+      restart_policy:
+        condition: unless-stopped
+    ports:
+      - "10051:10051"
+    networks:
+      - zabbix-net
+
+networks:
+  zabbix-net:
+    external: true
