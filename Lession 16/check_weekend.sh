@@ -7,6 +7,8 @@ current_day=$(date +%u)
 if [[ $current_day -gt 5 ]]; then
   # Проверяем, если пользователь не в группе admin
   if ! groups $PAM_USER | grep -qw admin; then
+    # Запрещаем доступ
+    echo "Login is not allowed on weekends for non-admin users."
     exit 1
   fi
 fi
