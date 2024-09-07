@@ -1,0 +1,51 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/centos9s"
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.name = "CentOS9CLI"
+    vb.cpus = 2
+    vb.memory = 4096
+  end
+
+  config.vm.provision "shell", inline: <<-SHELL
+    # Устанавливаем необходимые пакеты
+    yum install -y yum-utils
+    yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+    yum install -y pam docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+    # Создаем пользователя roman
+    useradd roman
+    echo "roman:17896520" | chpasswd
+    
+    # Создаем группу admin и добавляем пользователей root и vagrant
+    groupadd admin
+    usermod -aG admin root
+    usermod -aG admin vagrant
+
+    # Добавляем пользователя roman в группу docker
+    usermod -aG docker roman
+
+    # Даём пользователю roman права на перезапуск docker через sudo
+    echo "roman ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart docker" >> /etc/sudoers
+
+    # Включаем и запускаем Docker
+    systemctl enable docker
+    systemctl start docker
+
+    # Настраиваем PAM для ограничения входа в выходные дни
+    wget 'https://raw.githubusercontent.com/roman-rat/otus-roman/main/Lession%2016/check_weekend.sh'
+    mv check_weekend.sh /usr/local/bin/
+
+    chmod 755 /usr/local/bin/check_weekend.sh
+    chown root:root /usr/local/bin/check_weekend.sh
+
+    # Добавляем PAM правило в /etc/pam.d/sshd для запрета входа в выходные
+    echo "account required pam_exec.so /usr/local/bin/check_weekend.sh" >> /etc/pam.d/sshd
+
+
+    sudo chcon -t bin_t /usr/local/bin/check_weekend.sh
+
+    # Перезапуск SSH сервера для применения изменений
+    systemctl restart sshd
+  SHELL
+end
