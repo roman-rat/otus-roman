@@ -1,0 +1,156 @@
+- name: Set up nginx and logging on web server
+  hosts: web
+  become: true
+  vars:
+    log_server_ip: "192.168.56.11"
+  tasks:
+    - name: Install nginx
+      yum:
+        name: nginx
+        state: present
+
+    - name: Configure nginx to send logs to central log server
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '^(\s*access_log\s+)'
+        line: "    access_log syslog:server={{ log_server_ip }}:5044 combined;"
+
+    - name: Restrict local nginx logging to critical level only
+      lineinfile:
+        path: /etc/nginx/nginx.conf
+        regexp: '^(\s*error_log\s+)'
+        line: '    error_log /var/log/nginx/error.log crit;'
+
+    - name: Start and enable nginx
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Configure rsyslog to forward critical system logs to central log server
+      lineinfile:
+        path: /etc/rsyslog.conf
+        insertafter: '^#### RULES ####'
+        line: '*.=crit @{{ log_server_ip }}'
+
+    - name: Forward audit logs to log server
+      lineinfile:
+        path: /etc/rsyslog.conf
+        insertafter: '^#### RULES ####'
+        line: 'authpriv.* @{{ log_server_ip }}'
+
+    - name: Restart rsyslog to apply changes
+      service:
+        name: rsyslog
+        state: restarted
+
+- name: Set up ELK stack and logging on central log server
+  hosts: log
+  become: true
+  vars:
+    elk_version: "8.15.1"
+    elk_docker_compose_file: "/etc/elk-docker-compose.yml"
+  tasks:
+    - name: Set required virtual memory setting for Elasticsearch
+      sysctl:
+        name: vm.max_map_count
+        value: '262144'
+        state: present
+        reload: yes
+
+    - name: Install required packages for Docker
+      yum:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - yum-utils
+        - device-mapper-persistent-data
+        - lvm2
+
+    - name: Add Docker repository
+      command: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+      args:
+        creates: /etc/yum.repos.d/docker-ce.repo
+
+    - name: Install Docker CE
+      yum:
+        name: docker-ce
+        state: present
+      notify: Start Docker
+
+    - name: Remove old Elasticsearch data if exists
+      file:
+        path: /var/lib/elasticsearch
+        state: absent
+
+    - name: Create Docker Compose file for ELK stack
+      copy:
+        dest: "{{ elk_docker_compose_file }}"
+        content: |
+          version: '3.7'
+          services:
+            elk:
+              image: sebp/elk:{{ elk_version }}
+              container_name: elk
+              ports:
+                - "5601:5601" # Kibana
+                - "9200:9200" # Elasticsearch
+                - "5044:5044/udp" # Logstash input port
+              volumes:
+                - /etc/logstash:/etc/logstash
+              environment:
+                - discovery.type=single-node
+                - ES_JAVA_OPTS=-Xms1g -Xmx1g
+
+    - name: Ensure Logstash configuration directory exists
+      file:
+        path: /etc/logstash/conf.d
+        state: directory
+        mode: '0755'
+
+    - name: Create Logstash configuration for Nginx logs with Data Streams
+      copy:
+        dest: /etc/logstash/conf.d/nginx-logs.conf
+        content: |
+          input {
+            syslog {
+              port => 5044
+              type => "nginx"
+            }
+          }
+
+          filter {
+            if [type] == "nginx" {
+              grok {
+                match => { "message" => "%{COMBINEDAPACHELOG}" }
+              }
+              date {
+                match => [ "timestamp", "dd/MMM/YYYY:HH:mm:ss Z" ]
+                remove_field => [ "timestamp" ]
+              }
+            }
+          }
+
+          output {
+            elasticsearch {
+              hosts => ["http://localhost:9200"]
+              data_stream => true
+              data_stream_type => "logs"
+              data_stream_namespace => "nginx"
+            }
+            stdout { codec => rubydebug }
+          }
+
+
+    - name: Start ELK stack with Docker Compose
+      shell: |
+        docker compose -f "{{ elk_docker_compose_file }}" down || true
+        docker compose -f "{{ elk_docker_compose_file }}" up -d
+      args:
+        chdir: /etc
+
+  handlers:
+    - name: Start Docker
+      service:
+        name: docker
+        state: started

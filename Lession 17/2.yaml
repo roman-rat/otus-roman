@@ -1,0 +1,25 @@
+- name: Create Data View in Kibana
+  hosts: log
+  become: true
+  vars:
+    kibana_url: "http://localhost:5601"
+    data_view_title: "logs-generic-nginx*"
+    time_field_name: "@timestamp"
+  tasks:
+    - name: Ensure Docker service is started
+      service:
+        name: docker
+        state: started
+
+    - name: Create Data View in Kibana
+      uri:
+        url: "{{ kibana_url }}/api/data_views/data_view"
+        method: POST
+        headers:
+          kbn-xsrf: "true"
+        body:
+          data_view:
+            title: "{{ data_view_title }}"
+            timeFieldName: "{{ time_field_name }}"
+        body_format: json
+        status_code: 200

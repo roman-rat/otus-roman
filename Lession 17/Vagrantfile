@@ -1,0 +1,70 @@
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/centos9s"
+
+  # Указываем путь к публичному ключу на Windows
+  public_key_path = "C:/Users/atras/openstack.pub"
+
+  # Настройка машины web
+  config.vm.define "web" do |web|
+    web.vm.hostname = "web"
+    web.vm.network "private_network", ip: "192.168.56.10"
+
+    web.vm.provider "virtualbox" do |vb|
+      vb.name = "CentOS9_web"
+      vb.cpus = 2
+      vb.memory = 4096
+    end
+
+    # Копируем публичный ключ на машину web
+    web.vm.provision "file", source: public_key_path, destination: "/home/vagrant/openstack.pub"
+
+    web.vm.provision "shell", inline: <<-SHELL
+      # Создаем пользователя roman
+      useradd roman
+      echo "roman:17896520" | chpasswd
+      usermod -aG wheel roman
+
+      # Создаем .ssh директорию для пользователя roman и добавляем публичный ключ
+      mkdir -p /home/roman/.ssh
+      cat /home/vagrant/openstack.pub >> /home/roman/.ssh/authorized_keys
+      chown -R roman:roman /home/roman/.ssh
+      chmod 600 /home/roman/.ssh/authorized_keys
+
+      # Устанавливаем Ansible на web
+      dnf install -y epel-release
+      dnf install -y ansible
+    SHELL
+  end
+
+  # Настройка машины log
+  config.vm.define "log" do |log|
+    log.vm.hostname = "log"
+    log.vm.network "private_network", ip: "192.168.56.11"
+
+    log.vm.provider "virtualbox" do |vb|
+      vb.name = "CentOS9_log"
+      vb.cpus = 4
+      vb.memory = 8192
+    end
+
+    # Копируем публичный ключ на машину log
+    log.vm.provision "file", source: public_key_path, destination: "/home/vagrant/openstack.pub"
+
+    log.vm.provision "shell", inline: <<-SHELL
+      # Создаем пользователя roman
+      useradd roman
+      echo "roman:17896520" | chpasswd
+      usermod -aG wheel roman
+
+      # Создаем .ssh директорию для пользователя roman и добавляем публичный ключ
+      mkdir -p /home/roman/.ssh
+      cat /home/vagrant/openstack.pub  >> /home/roman/.ssh/authorized_keys
+      chown -R roman:roman /home/roman/.ssh
+      chmod 600 /home/roman/.ssh/authorized_keys
+
+      # Устанавливаем Ansible на log
+      dnf install -y epel-release
+      dnf install -y ansible
+    SHELL
+  end
+end
